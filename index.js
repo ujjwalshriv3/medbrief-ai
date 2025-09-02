@@ -64,7 +64,7 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
         const result = await Tesseract.recognize(Buffer.from(base64Image, 'base64'), "eng");
         extractedText = result.data.text;
       } else {
-        extractedText = Unsupported file type: ${file.originalname};
+        extractedText = `Unsupported file type: ${file.originalname}`;
       }
 
       // No need to delete file since it's not saved to disk
