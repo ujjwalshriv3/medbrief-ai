@@ -11,7 +11,7 @@ dotenv.config();
 
 // Resolve __dirname
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const _dirname = dirname(_filename);
 
 // PDF.js config
 import {
@@ -32,7 +32,7 @@ const upload = multer({ storage });
 
 // Remove markdown bold
 function removeMarkdownBold(text) {
-  return text.replace(/\*\*(.*?)\*\*/g, "$1");
+  return text.replace(/\\(.?)\\*/g, "$1");
 }
 
 app.post("/upload", upload.array("files", 10), async (req, res) => {
@@ -64,12 +64,12 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
         const result = await Tesseract.recognize(Buffer.from(base64Image, 'base64'), "eng");
         extractedText = result.data.text;
       } else {
-        extractedText = `Unsupported file type: ${file.originalname}`;
+        extractedText = Unsupported file type: ${file.originalname};
       }
 
       // No need to delete file since it's not saved to disk
       console.log(
-        `📄 Extracted text for ${file.originalname}:\n`,
+        📄 Extracted text for ${file.originalname}:\n,
         extractedText
       );
 
@@ -87,7 +87,7 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
       <li><strong>Hospital:</strong></li>
       <li><strong>Consultant:</strong></li>
     </ul>
-
+    
     <b>Key Findings:</b>
     <ul>
     <li>Finding 1</li>
@@ -95,8 +95,23 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
     <li>Finding 3</li>
     </ul>
 
-    <b>Impression:</b>
-    <one short paragraph>
+    Always format the Interpretation section as bullet points inside <ul><li> tags.
+    Use simple, everyday language that a patient can easily understand.
+    Avoid medical jargon (e.g., say “cancer cells” instead of “malignant epithelial cells”).
+    Keep it short and clear, not more than 1–2 simple lines per point.
+    <b>Interpretation:</b>
+    <ul>
+    <li>Point 1</li>
+    <li>Point 2</li>
+    <li>Point 3</li>
+    </ul>
+
+    <b>Possible Causes:</b>
+    <ul>
+    <li>Possible Causes 1</li>
+    <li>Possible Causes 2</li>
+    <li>Possible Causes 3</li>
+    </ul>
 
     <b>Suggested Next Steps:</b>
     <ul>
@@ -116,22 +131,27 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
         {
           model: "llama-3.3-70b-versatile",
           messages: [
-        {
-          role: "system",
-          content: `
+            {
+              role: "system",
+              content: `
     You are a helpful medical summarizer that outputs clean, well-formatted HTML with bold headings and lists.
     You are a medical report interpretation assistant.
 
     Your task is to read a patient’s medical report and produce a detailed, structured explanation that combines clinical accuracy with patient understanding.
 
+    When outputting section headings like "Report Summary:", "Key Findings:", 
+    "Interpretation:", "Possible Causes:", "Suggested Next Steps:", 
+    "Overall Health Status:", and "Patient-Friendly Explanation:", 
+    always wrap them inside <p><b> ... </b></p> instead of just <b> ... </b>.
+
     Follow these rules:
 
-    1. **Tone & Style**
+    1. *Tone & Style*
        - Professional but clear.
        - Avoid jargon where possible; when using medical terms, include a short explanation in parentheses.
        - Avoid fear-based wording unless results indicate a serious health risk.
 
-    2. **Structure**
+    2. *Structure*
        - Use HTML <b>bold headings</b> for each section.
        - Use <ul><li>...</li></ul> for lists where appropriate.
          <b>Patient Information:</b>
@@ -145,41 +165,43 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
       <strong>Hospital:</strong>
       <strong>Consultant:</strong>
   
-       - **Report Summary** → Mention the type of test, when it was done, and the laboratory.
-       - **Key Findings** → List main results with values, units, and reference ranges.
-       - **Interpretation** → Explain what each finding means in plain language.
-       - **Possible Causes** → Include both medical and non-medical factors that may influence the results.
-       - **Limitations** → Note any factors that might affect accuracy or require further tests.
-       - **Suggest Next Steps** → Suggest follow-up actions or discussions with a healthcare provider.
+       - *Report Summary* → Mention the type of test, when it was done, and the laboratory.
+       - *Key Findings* → List main results with values, units, and reference ranges.
+       - *Interpretation* → Explain what each finding means in plain and human language.
+       - *Possible Causes* → Include both medical and non-medical factors that may influence the results.
+       - *Suggested Next Steps* → Suggest follow-up actions or discussions with a healthcare provider.
 
-    3. **Detail Level**
+    3. *Detail Level*
        - Always include <b>exact values</b> and <b>reference ranges</b>.
        - Mention whether results are normal, borderline, or abnormal.
        - Link each value to its possible health significance.
 
-    4. **Readability**
+    4. *Readability*
        - Use short paragraphs or bullet points for clarity.
        - Keep sentences under 20 words when possible.
        - Preserve all formatting using HTML tags for headings, lists, and paragraphs.
 
-    5. **Patient Context**
+    5. *Patient Context*
        - Relate findings to the patient’s health and potential future risks.
        - Provide a concise summary of the overall health status at the end.
 
     Your goal: Deliver an explanation that retains full medical precision, includes methodology and reference ranges, and is understandable for an educated patient. Output must be well-formatted HTML.
           `,
-        },
-        { role: "user", content: prompt },
+            },
+            { role: "user", content: prompt },
           ],
           temperature: 0.3,
           max_tokens: 2048,
         },
-        { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` } }
+        { headers: { Authorization: Bearer ${process.env.GROQ_API_KEY} } }
       );
 
       let summaryHTML =
         summaryRes.data?.choices?.[0]?.message?.content ||
         "No summary generated.";
+
+      summaryHTML = summaryHTML.replace(/<b>(.*?)<\/b>/g, "<p><b>$1</b></p>");
+      summaryHTML = summaryHTML.replace(/<p><b>Patient-Friendly Explanation:.*$/s, "");
 
       // Patient-friendly explanation as HTML bullet list
       const explainRes = await axios.post(
@@ -189,53 +211,44 @@ app.post("/upload", upload.array("files", 10), async (req, res) => {
           messages: [
             {
               role: "system",
-              content: `You are an expert medical report explainer whose primary goal is to help patients understand their medical summaries in clear, simple language.  
+              content: `You are a medical explainer. Your job is to rewrite the medical report in simple, patient-friendly language.  
 
-              Your task is to take a medical report summary and rewrite it in a way that is easy for patients to understand.
+Rules:  
+- Avoid ALL medical jargon. If you must use a medical term (like biopsy, chemotherapy), give a very short, plain explanation in brackets. Example: “biopsy (a small tissue test)”.  
+- Keep every sentence short and clear (maximum 15 words).  
+- Use a warm, reassuring tone.  
+- Focus only on what the patient needs to know: diagnosis, stage (if any), spread/no spread, treatment steps, and follow-up importance.  
+- Never include lab terms like BI-RADS, hypoechoic, epithelial, ER+/PR+, or HER2 — instead use “tests show cancer is present” or “cancer responds to hormones.”  
+- Do not include hospital technicalities (like CT, MRI, margins). Translate them to “scan” or “imaging test.”  
+- Output strictly as an HTML unordered list (<ul><li>...</li></ul>), with 4–6 bullet points.  
+- Each bullet must be simple, friendly, and less than 18 words.  
+- No introduction or conclusion, only the list.  
 
-              You must focus on the most important findings, potential risks, and recommended next steps, avoiding any complex medical terminology or jargon.
-
-              Your explanations should be accessible to anyone, regardless of their medical background, and you must avoid technical jargon wherever possible. 
-
-              If you must use a medical term, provide a brief explanation in parentheses so the patient can easily grasp its meaning. Focus on summarizing the most important findings, potential risks, and recommended next steps from the report, ensuring that each point is concise and easy to follow. 
-
-              Present your output strictly as an HTML unordered list (<ul><li>...</li></ul>), containing exactly 4 to 6 bullet points. Each bullet should be a short, direct sentence no longer than 18 words, and should communicate the information in a friendly, reassuring manner. 
-              Do not include any introductory or closing remarks, and do not add any text outside the list. 
-              
-              Your goal is to empower patients with clear, actionable information about their health in a format they can easily share or refer to.`,
+Your goal: make the report so clear that even someone with zero medical background understands it fully.`,
             },
             {
               role: "user",
-              content: `Rewrite this for a patient in short bullet points:\n${summaryHTML}`,
+              content: Rewrite this for a patient in short bullet points:\n${summaryHTML},
             },
           ],
         },
-        { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` } }
+        { headers: { Authorization: Bearer ${process.env.GROQ_API_KEY} } }
       );
 
       let explanation = explainRes.data?.choices?.[0]?.message?.content || "";
       explanation = removeMarkdownBold(explanation);
 
-      // Merge into HTML with bullets like Suggested Next Steps
       const finalHTML = `
   <div style="font-family: Arial, sans-serif; line-height: 1.5;">
     ${summaryHTML}
-    <b>Patient-Friendly Explanation:</b>
+    <p><b>Patient-Friendly Explanation:</b></p>
     ${explanation}
   </div>
 `;
 
-      // No PDF generation to disk - removed to avoid file storage
-      // const pdfPath = await generatePDF(
-      //   finalHTML,
-      //   file.originalname.replace(/\.[^/.]+$/, "")
-      // );
-      // const pdfURL = `http://localhost:3001${pdfPath}`;
-
       patientSummaries.push({
         fileName: file.originalname,
         summary: finalHTML,
-        // pdfLink: pdfURL, // Removed since no PDF is generated to disk
       });
     }
 
